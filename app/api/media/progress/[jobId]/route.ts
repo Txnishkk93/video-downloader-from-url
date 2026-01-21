@@ -1,41 +1,54 @@
+// app/api/media/progress/[job_id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { jobStore } from "@/lib/server/jobStore";
+import { jobs } from "../../download/route";
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> },
+  req: NextRequest,
+  { params }: { params: { job_id: string } }
 ) {
-  const { jobId } = await params;
-  const job = jobStore.getJob(jobId);
+  try {
+    const { job_id } = params;
 
-  if (!job) {
-    console.error("Job not found:", jobId, "Available jobs:", jobStore.getAllJobIds());
-    return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
-  }
+    console.log("[progress] Checking job:", job_id);
 
-  if (job.status === "completed") {
-    const fileUrl = `/api/media/file/${jobId}`;
+    const job = jobs.get(job_id);
+
+    if (!job) {
+      console.log("[progress] Job not found:", job_id);
+      return NextResponse.json(
+        {
+          success: false,
+          status: "error",
+          progress: 0,
+          error: "Job not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    console.log("[progress] Job status:", {
+      job_id,
+      status: job.status,
+      progress: job.progress,
+    });
+
     return NextResponse.json({
       success: true,
-      status: "completed",
-      progress: 100,
-      file_url: fileUrl,
-    });
-  }
-
-  if (job.status === "error") {
-    return NextResponse.json({
-      success: false,
-      status: "error",
+      status: job.status,
       progress: job.progress,
-      error: job.error || "Unknown error",
+      file_url: job.file_url,
+      error: job.error,
     });
+  } catch (error) {
+    console.error("[progress] Error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        status: "error",
+        progress: 0,
+        error: "Failed to get progress",
+      },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-    success: true,
-    status: job.status,
-    progress: job.progress,
-  });
 }
-
