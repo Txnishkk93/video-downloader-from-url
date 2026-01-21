@@ -1,3 +1,4 @@
+// app/api/media/info/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { fetchVideoInfo } from "@/lib/server/videoInfoFetcher";
 
@@ -10,20 +11,57 @@ function isValidUrl(url: string): boolean {
   }
 }
 
+function isYouTubeUrl(url: string): boolean {
+  return url.includes("youtube.com") || url.includes("youtu.be");
+}
+
 export async function POST(req: NextRequest) {
-  const { url } = await req.json().catch(() => ({ url: "" }));
-
-  if (!url) {
-    return NextResponse.json({ success: false, error: "URL required" }, { status: 400 });
-  }
-
-  if (!isValidUrl(url)) {
-    return NextResponse.json({ success: false, error: "Invalid URL format" }, { status: 400 });
-  }
-
+  const startTime = Date.now();
+  
   try {
-    console.log("[media-info] Fetching info for URL:", url);
+    // Parse request body
+    const body = await req.json().catch(() => ({ url: "" }));
+    const { url } = body;
+
+    console.log("[media-info] Request received:", {
+      url,
+      timestamp: new Date().toISOString(),
+      isVercel: process.env.VERCEL === "1",
+    });
+
+    // Validation
+    if (!url) {
+      console.log("[media-info] Missing URL parameter");
+      return NextResponse.json(
+        { success: false, error: "URL required" },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidUrl(url)) {
+      console.log("[media-info] Invalid URL format:", url);
+      return NextResponse.json(
+        { success: false, error: "Invalid URL format" },
+        { status: 400 }
+      );
+    }
+
+    if (!isYouTubeUrl(url)) {
+      console.log("[media-info] Non-YouTube URL provided:", url);
+      return NextResponse.json(
+        { success: false, error: "Please provide a YouTube URL" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch video info
+    console.log("[media-info] Fetching video info for:", url);
     const info = await fetchVideoInfo(url);
+    
+    const responseTime = Date.now() - startTime;
+    console.log("[media-info] Success! Response time:", responseTime, "ms");
+    console.log("[media-info] Video title:", info.title);
+    console.log("[media-info] Formats found:", info.formats.length);
 
     return NextResponse.json({
       success: true,
@@ -34,19 +72,57 @@ export async function POST(req: NextRequest) {
       formats: info.formats,
       audio_formats: info.audio_formats,
     });
+
   } catch (err) {
-    console.error("[media-info] Error:", err instanceof Error ? err.message : err);
+    const responseTime = Date.now() - startTime;
+    
+    console.error("[media-info] Error occurred:", {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      responseTime,
+    });
+
+    // Determine appropriate error message
+    let errorMessage = "Failed to fetch video info. Please try again.";
+    let statusCode = 500;
+
+    if (err instanceof Error) {
+      if (err.message.includes("Could not extract video ID")) {
+        errorMessage = "Invalid YouTube URL format";
+        statusCode = 400;
+      } else if (err.message.includes("Video not found")) {
+        errorMessage = "Video not found or unavailable";
+        statusCode = 404;
+      } else if (err.message.includes("timeout") || err.message.includes("ETIMEDOUT")) {
+        errorMessage = "Request timed out. Please try again.";
+        statusCode = 504;
+      } else if (err.message.includes("rate limit")) {
+        errorMessage = "Rate limited. Please wait a moment and try again.";
+        statusCode = 429;
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error:
-          err instanceof Error && err.message.includes("Could not")
-            ? "Please provide a YouTube URL"
-            : "Failed to fetch video info. Try again.",
+        error: errorMessage,
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }
 
-
+// Add OPTIONS handler for CORS (if needed)
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json(
+    {},
+    {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    }
+  );
+}
