@@ -1,4 +1,5 @@
-import { Music2, Disc3, User } from "lucide-react";
+
+import { Music2, Disc3, User, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -7,9 +8,12 @@ interface SpotifyCardProps {
   artist: string;
   album: string;
   coverImage: string;
+  onDownload?: () => void;
+  downloading?: boolean;
+  downloadReady?: boolean;
 }
 
-export function SpotifyCard({ title, artist, album, coverImage }: SpotifyCardProps) {
+export function SpotifyCard({ title, artist, album, coverImage, onDownload, downloading, downloadReady }: SpotifyCardProps) {
   return (
     <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in">
       <CardContent className="p-0">
@@ -42,8 +46,28 @@ export function SpotifyCard({ title, artist, album, coverImage }: SpotifyCardPro
           </div>
         </div>
         <div className="px-4 pb-4">
-          <Button disabled className="w-full" variant="secondary">
-            Coming Soon
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={onDownload}
+            disabled={downloading || downloadReady}
+          >
+            {downloading ? (
+              <>
+                <Download className="mr-2 h-4 w-4 animate-spin" />
+                Downloading...
+              </>
+            ) : downloadReady ? (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Ready!
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

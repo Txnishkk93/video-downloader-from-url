@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const ytDlp = await getYtDlpWrap();
-
     const args: string[] = [
       "--dump-json",
       "--no-playlist",
@@ -45,103 +44,71 @@ export async function POST(req: NextRequest) {
       "--referer",
       "https://www.youtube.com/",
     ];
-
     args.push(url);
-
     console.log("Fetching info for URL:", url);
     const stdout = await ytDlp.execPromise(args, { shell: false });
-    console.log("yt-dlp raw output length:", stdout.length);
     const json: any = JSON.parse(stdout);
 
-    const videoFormats: Format[] = [
-      {
-        format_id: "bestvideo[height<=2160]+bestaudio/best",
-        quality: "4K (2160p)",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "2160p",
-      },
-      {
-        format_id: "bestvideo[height<=1440]+bestaudio/best",
-        quality: "2K (1440p)",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "1440p",
-      },
-      {
-        format_id: "bestvideo[height<=1080]+bestaudio/best",
-        quality: "1080p",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "1080p",
-      },
-      {
-        format_id: "bestvideo[height<=720]+bestaudio/best",
-        quality: "720p",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "720p",
-      },
-      {
-        format_id: "bestvideo[height<=480]+bestaudio/best",
-        quality: "480p",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "480p",
-      },
-      {
-        format_id: "bestvideo[height<=360]+bestaudio/best",
-        quality: "360p",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "360p",
-      },
-      {
-        format_id: "bestvideo[height<=240]+bestaudio/best",
-        quality: "240p",
-        ext: "mp4",
-        filesize: 0,
-        has_audio: true,
-        has_video: true,
-        resolution: "240p",
-      },
-    ];
-
-    const audioFormats: Format[] = [
-      {
-        format_id: "bestaudio",
-        quality: "Best Audio",
-        ext: "m4a",
-        filesize: 0,
-        has_audio: true,
-        has_video: false,
-        resolution: "audio",
-      },
-    ];
-
-    const availableHeights = new Set<number>();
+    // Parse yt-dlp formats for muxed (video+audio) and best mergeable pairs
+    const formats: Format[] = [];
+    const audioFormats: Format[] = [];
+    const seenMuxed = new Set();
     (json.formats || []).forEach((f: any) => {
-      if (f.height && f.vcodec !== "none") {
-        availableHeights.add(f.height);
+      // Muxed (video+audio in one file)
+      if (f.vcodec !== "none" && f.acodec !== "none") {
+        const label = `${f.format_note || f.resolution || f.height + 'p' || ''}`.replace(/\s+/g, ' ').trim();
+        const quality = label || `${f.height ? f.height + 'p' : ''}`;
+        if (!seenMuxed.has(f.format_id)) {
+          formats.push({
+            format_id: f.format_id,
+            ext: f.ext,
+            quality: quality,
+            filesize: f.filesize || 0,
+            has_audio: true,
+            has_video: true,
+            resolution: f.resolution || (f.height ? f.height + 'p' : undefined),
+          });
+          seenMuxed.add(f.format_id);
+        }
+      } else if (f.vcodec === "none" && f.acodec !== "none") {
+        // Audio only
+        audioFormats.push({
+          format_id: f.format_id,
+          ext: f.ext,
+          quality: f.abr ? `${f.abr}kbps` : f.format_note || f.ext,
+          filesize: f.filesize || 0,
+          has_audio: true,
+          has_video: false,
+          resolution: "audio",
+        });
       }
     });
 
-    const filteredVideoFormats = videoFormats.filter((format) => {
-      const height = parseInt(format.resolution || "0", 10);
-      return Array.from(availableHeights).some((h) => h >= height);
+    // If no muxed formats, try to offer bestvideo+bestaudio merge (yt-dlp will merge)
+    if (formats.length === 0 && (json.formats || []).length > 0) {
+      // Find best video and best audio
+      const bestVideo = (json.formats || []).filter((f: any) => f.vcodec !== "none" && f.acodec === "none").sort((a: any, b: any) => (b.height || 0) - (a.height || 0))[0];
+      const bestAudio = (json.formats || []).filter((f: any) => f.vcodec === "none" && f.acodec !== "none").sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0))[0];
+      if (bestVideo && bestAudio) {
+        formats.push({
+          format_id: `${bestVideo.format_id}+${bestAudio.format_id}`,
+          ext: bestVideo.ext,
+          quality: `${bestVideo.height ? bestVideo.height + 'p' : ''} (merge)`,
+          filesize: (bestVideo.filesize || 0) + (bestAudio.filesize || 0),
+          has_audio: true,
+          has_video: true,
+          resolution: bestVideo.resolution || (bestVideo.height ? bestVideo.height + 'p' : undefined),
+        });
+      }
+    }
+
+    // Remove duplicates and sort by quality descending
+    const uniqueFormats = Array.from(new Map(formats.map(f => [f.format_id, f])).values());
+    uniqueFormats.sort((a, b) => {
+      const getHeight = (q: string) => parseInt((q.match(/(\d+)p/) || [])[1] || '0', 10);
+      return getHeight(b.quality) - getHeight(a.quality);
     });
+    audioFormats.sort((a, b) => (b.filesize || 0) - (a.filesize || 0));
 
     return NextResponse.json({
       success: true,
@@ -149,7 +116,7 @@ export async function POST(req: NextRequest) {
       title: json.title || "Unknown Title",
       thumbnail: json.thumbnail || json.thumbnails?.[0]?.url || "",
       duration: json.duration || 0,
-      formats: filteredVideoFormats.length > 0 ? filteredVideoFormats : videoFormats,
+      formats: uniqueFormats,
       audio_formats: audioFormats,
     });
   } catch (err: any) {

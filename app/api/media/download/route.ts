@@ -76,12 +76,15 @@ export async function POST(req: NextRequest) {
           "bestaudio/best",
         );
       } else {
-        // For video, use the format_id which already includes video+audio
+        // For video, always use the selected format_id (should be video+audio)
+        // Defensive: if format_id is audio-only, fallback to bestvideo+bestaudio
+        const isAudioOnly = String(format_id).startsWith("bestaudio");
+        const videoFormat = isAudioOnly ? "bestvideo+bestaudio/best" : String(format_id);
         console.log("=== VIDEO DOWNLOAD MODE ===");
-        console.log("Using format:", format_id);
+        console.log("Using format:", videoFormat);
         args.push(
           "-f",
-          String(format_id),
+          videoFormat,
           "--merge-output-format",
           "mp4",
         );

@@ -34,6 +34,60 @@ export default function DashboardPage() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  // Spotify download state
+  const [spotifyJobId, setSpotifyJobId] = useState<string | null>(null);
+  const [spotifyDownloading, setSpotifyDownloading] = useState(false);
+  const [spotifyProgress, setSpotifyProgress] = useState<ProgressResponse | null>(null);
+  // Spotify download handler
+  const handleSpotifyDownload = async () => {
+    if (!url.trim()) return;
+    setSpotifyDownloading(true);
+    setSpotifyProgress({ status: "pending", progress: 0 });
+    try {
+      // Use yt-dlp to download Spotify as audio (mp3)
+      const response = await startDownload(
+        url,
+        "bestaudio",
+        "audio",
+        "mp3"
+      );
+      if (response.success) {
+        setSpotifyJobId(response.job_id);
+        toast.success("Spotify download started");
+      } else {
+        throw new Error("Failed to start Spotify download");
+      }
+    } catch (error) {
+      toast.error("Failed to start Spotify download");
+      setSpotifyDownloading(false);
+      setSpotifyProgress(null);
+    }
+  };
+  // Poll Spotify download progress
+  useEffect(() => {
+    if (!spotifyJobId || !spotifyDownloading) return;
+    const interval = setInterval(async () => {
+      try {
+        const progressData = await getProgress(spotifyJobId);
+        setSpotifyProgress(progressData);
+        if (progressData.status === "completed") {
+          setSpotifyDownloading(false);
+          toast.success("Spotify download complete!");
+        } else if (progressData.status === "error") {
+          setSpotifyDownloading(false);
+          toast.error(progressData.error || "Spotify download failed");
+        }
+      } catch (error) {
+        setSpotifyDownloading(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [spotifyJobId, spotifyDownloading]);
+  const handleSpotifyDownloadFile = () => {
+    if (spotifyProgress?.file_url) {
+      window.open(spotifyProgress.file_url, "_blank");
+    }
+  };
 
   const handleFetchInfo = async () => {
     if (!url.trim()) {
@@ -182,6 +236,13 @@ export default function DashboardPage() {
               artist={spotifyInfo.artist}
               album={spotifyInfo.album}
               coverImage={spotifyInfo.cover_image}
+              onDownload={
+                spotifyProgress?.status === "completed" && spotifyProgress.file_url
+                  ? handleSpotifyDownloadFile
+                  : handleSpotifyDownload
+              }
+              downloading={spotifyDownloading}
+              downloadReady={spotifyProgress?.status === "completed" && !!spotifyProgress.file_url}
             />
           )}
 
@@ -198,11 +259,14 @@ export default function DashboardPage() {
               {/* Download Options */}
               <Card className="border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in">
                 <CardContent className="p-6 space-y-6">
+
                   {mediaInfo.formats && mediaInfo.formats.length > 0 && (
                     <FormatSelector
                       formats={mediaInfo.formats}
+                      audioFormats={mediaInfo.audio_formats}
                       selectedFormat={selectedFormat}
                       onFormatChange={setSelectedFormat}
+                      downloadType={downloadType}
                     />
                   )}
 
