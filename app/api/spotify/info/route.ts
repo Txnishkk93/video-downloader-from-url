@@ -42,5 +42,5 @@ export async function POST(req: NextRequest) {
       { success: false, error: errorMessage || "Failed to fetch Spotify info" },
       { status: 400 },
     );
+  }
 }
-

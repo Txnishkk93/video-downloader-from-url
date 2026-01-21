@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const handleSpotifyDownload = async () => {
     if (!url.trim()) return;
     setSpotifyDownloading(true);
-    setSpotifyProgress({ status: "pending", progress: 0 });
+    setSpotifyProgress({ success: true, status: "pending", progress: 0 });
     try {
       // Use yt-dlp to download Spotify as audio (mp3)
       const response = await startDownload(
@@ -129,7 +129,7 @@ export default function DashboardPage() {
     }
 
     setDownloading(true);
-    setProgress({ status: "pending", progress: 0 });
+    setProgress({ success: true, status: "pending", progress: 0 });
 
     try {
       const response = await startDownload(

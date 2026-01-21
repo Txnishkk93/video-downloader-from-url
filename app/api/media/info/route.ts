@@ -151,16 +151,14 @@ export async function POST(req: NextRequest) {
 
     if (raw.includes("video is unavailable") || raw.includes("Video unavailable")) {
       errorMessage = "This video is unavailable.";
-    } else if (raw.includes("Requested format is not available") || stderr.includes("Requested format")) {
+    } else if (raw.includes("Requested format is not available") || raw.includes("Requested format")) {
       errorMessage = "This video format is not available. The video may be private or restricted.";
-    } else if (raw.includes("Unsupported URL") || stderr.includes("Unsupported URL")) {
+    } else if (raw.includes("Unsupported URL")) {
       errorMessage = "This URL is not supported. Please check the URL and try again.";
-    } else if (raw.includes("HTTP Error 403") || stderr.includes("HTTP Error 403")) {
+    } else if (raw.includes("HTTP Error 403")) {
       errorMessage = "Access denied. The video may be age-restricted or region-locked.";
-    } else if (raw.includes("HTTP Error 404") || stderr.includes("HTTP Error 404")) {
+    } else if (raw.includes("HTTP Error 404")) {
       errorMessage = "Video not found. The URL may be incorrect or the video may have been removed.";
-    } else if (stderr) {
-      errorMessage = `Error: ${stderr.substring(0, 200)}`;
     }
 
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
