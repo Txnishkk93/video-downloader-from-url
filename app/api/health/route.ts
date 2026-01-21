@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { jobs } from "../media/download/route";
+import { jobStore } from "@/lib/server/jobStore";
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", jobs: Object.keys(jobs).length });
+  return NextResponse.json({ status: "ok", jobs: jobStore.getAllJobIds().length });
 }
-
