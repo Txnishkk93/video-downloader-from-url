@@ -83,22 +83,26 @@ export async function fetchSpotifyInfo(spotify_url: string): Promise<SpotifyInfo
   return response.data;
 }
 
+// Update your startDownload function in api.ts
 export async function startDownload(
   url: string,
   format_id: string,
   type: "video" | "audio",
   audio_format?: string
 ): Promise<DownloadResponse> {
-  if (!url || !format_id) throw new Error("URL and format_id required");
-
-  const response = await api.post("/api/media/download", {
-    url: url.trim(),
-    format_id,
-    type,
-    audio_format,
-  });
-
-  return response.data;
+  // Extract video ID
+  const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
+  
+  if (!videoId) throw new Error("Invalid YouTube URL");
+  
+  // For now, redirect to external service
+  const downloadUrl = `https://9xbuddy.org/process?url=${encodeURIComponent(url)}`;
+  window.open(downloadUrl, '_blank');
+  
+  return {
+    success: true,
+    job_id: 'direct-download',
+  };
 }
 
 export async function getProgress(job_id: string): Promise<ProgressResponse> {
