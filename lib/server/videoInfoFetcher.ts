@@ -3,28 +3,42 @@
  * Falls back to external API when yt-dlp is unavailable
  */
 
+interface VideoFormat {
+  format_id: string;
+  quality: string;
+  ext: string;
+  filesize: number;
+  has_audio: boolean;
+  has_video: boolean;
+  resolution?: string;
+}
+
 interface VideoMetadata {
   title: string;
   duration: number;
   thumbnail: string;
-  formats: Array<{
-    format_id: string;
-    quality: string;
-    ext: string;
-    filesize: number;
-    has_audio: boolean;
-    has_video: boolean;
-    resolution?: string;
-  }>;
-  audio_formats: Array<{
-    format_id: string;
-    quality: string;
-    ext: string;
-    filesize: number;
-    has_audio: boolean;
-    has_video: boolean;
-    resolution?: string;
-  }>;
+  formats: VideoFormat[];
+  audio_formats: VideoFormat[];
+}
+
+interface ApiFormat {
+  format_id?: string;
+  itag?: string;
+  height?: number;
+  width?: number;
+  ext?: string;
+  filesize?: number;
+  vcodec?: string;
+  acodec?: string;
+  abr?: number;
+}
+
+interface ApiResponse {
+  title?: string;
+  duration?: number;
+  thumbnail?: string;
+  formats?: ApiFormat[];
+  audio_formats?: ApiFormat[];
 }
 
 /**
@@ -56,31 +70,31 @@ async function fetchFromYtSearch(url: string): Promise<VideoMetadata> {
       throw new Error(`API returned ${response.status}`);
     }
 
-    const data: any = await response.json();
+    const data: ApiResponse = await response.json();
 
     // Transform API response to our format
     return {
       title: data.title || "Unknown Title",
       duration: data.duration || 0,
       thumbnail: data.thumbnail || "",
-      formats: data.formats?.map((f: any) => ({
-        format_id: f.format_id || f.itag,
+      formats: (data.formats || []).map((f: ApiFormat) => ({
+        format_id: f.format_id || f.itag || "",
         quality: `${f.height || "unknown"}p`,
         ext: f.ext || "mp4",
         filesize: f.filesize || 0,
         has_audio: f.acodec !== "none",
         has_video: f.vcodec !== "none",
         resolution: f.height ? `${f.height}p` : undefined,
-      })) || [],
-      audio_formats: data.audio_formats?.map((f: any) => ({
-        format_id: f.format_id || f.itag,
+      })),
+      audio_formats: (data.audio_formats || []).map((f: ApiFormat) => ({
+        format_id: f.format_id || f.itag || "",
         quality: `${f.abr || "unknown"}kbps`,
         ext: f.ext || "m4a",
         filesize: f.filesize || 0,
         has_audio: true,
         has_video: false,
         resolution: "audio",
-      })) || [],
+      })),
     };
   } catch (error) {
     console.error("[video-info] ytsearch failed:", error);
@@ -115,28 +129,28 @@ export async function fetchVideoInfo(url: string, tryYtDlp: boolean = true): Pro
     ];
 
     const stdout = await ytDlp.execPromise(args, { shell: false });
-    const json: any = JSON.parse(stdout);
+    const json: ApiResponse = JSON.parse(stdout);
 
     // Format the response
-    const formats: any[] = [];
-    const audioFormats: any[] = [];
+    const formats: VideoFormat[] = [];
+    const audioFormats: VideoFormat[] = [];
 
-    (json.formats || []).forEach((f: any) => {
+    (json.formats || []).forEach((f: ApiFormat) => {
       if (f.vcodec !== "none" && f.acodec !== "none") {
         formats.push({
-          format_id: f.format_id,
+          format_id: f.format_id || f.itag || "",
           quality: `${f.height || "unknown"}p`,
-          ext: f.ext,
+          ext: f.ext || "mp4",
           filesize: f.filesize || 0,
           has_audio: true,
           has_video: true,
-          resolution: f.resolution || (f.height ? `${f.height}p` : undefined),
+          resolution: f.height ? `${f.height}p` : undefined,
         });
       } else if (f.vcodec === "none" && f.acodec !== "none") {
         audioFormats.push({
-          format_id: f.format_id,
+          format_id: f.format_id || f.itag || "",
           quality: f.abr ? `${f.abr}kbps` : "unknown",
-          ext: f.ext,
+          ext: f.ext || "m4a",
           filesize: f.filesize || 0,
           has_audio: true,
           has_video: false,
@@ -149,8 +163,8 @@ export async function fetchVideoInfo(url: string, tryYtDlp: boolean = true): Pro
       title: json.title || "Unknown Title",
       duration: json.duration || 0,
       thumbnail: json.thumbnail || "",
-      formats: formats.slice(0, 10), // Limit to top 10
-      audio_formats: audioFormats.slice(0, 5), // Limit to top 5
+      formats: formats.slice(0, 10),
+      audio_formats: audioFormats.slice(0, 5),
     };
   } catch (error) {
     console.error("[video-info] yt-dlp failed, falling back to API:", error);
