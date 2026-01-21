@@ -5,6 +5,10 @@ import { v4 as uuid } from "uuid";
 import { getFfmpegLocation, getYtDlpWrap } from "@/lib/server/ytDlp";
 import { jobStore } from "@/lib/server/jobStore";
 
+interface ProgressEvent {
+  percent?: number;
+}
+
 const DOWNLOAD_DIR = path.join(process.env.TMPDIR || "/tmp", "downloads");
 if (!fs.existsSync(DOWNLOAD_DIR)) fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
@@ -96,7 +100,7 @@ export async function POST(req: NextRequest) {
 
       const emitter = ytDlp.exec(args, { shell: false });
 
-      emitter.on('progress', (progress: any) => {
+      emitter.on('progress', (progress: ProgressEvent) => {
         const percent = typeof progress?.percent === "number" ? progress.percent : 0;
         jobStore.updateJob(jobId, { progress: Math.max(0, Math.min(100, percent)) });
         console.log(`Job ${jobId} progress:`, percent);
@@ -129,19 +133,21 @@ export async function POST(req: NextRequest) {
               error: "File not found after download",
             });
           }
-        } catch (e: any) {
+        } catch (e) {
           console.error(`Error finalizing job ${jobId}:`, e);
+          const errorMessage = e instanceof Error ? e.message : String(e);
           jobStore.updateJob(jobId, {
             status: "error",
-            error: e?.message || "Failed to locate downloaded file",
+            error: errorMessage || "Failed to locate downloaded file",
           });
         }
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error(`Failed to start download for job ${jobId}:`, e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
       jobStore.updateJob(jobId, {
         status: "error",
-        error: e?.message || "Download failed",
+        error: errorMessage || "Download failed",
       });
     }
   })();

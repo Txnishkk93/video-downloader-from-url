@@ -19,7 +19,15 @@ export async function POST(req: NextRequest) {
       spotify_url,
     ];
     const stdout = await ytDlp.execPromise(args, { shell: false });
-    const json: any = JSON.parse(stdout);
+    interface SpotifyData {
+      title?: string;
+      artist?: string;
+      uploader?: string;
+      album?: string;
+      thumbnail?: string;
+      thumbnails?: Array<{ url: string }>;
+    }
+    const json: SpotifyData = JSON.parse(stdout);
     return NextResponse.json({
       success: true,
       title: json.title || "Unknown Title",
@@ -27,8 +35,12 @@ export async function POST(req: NextRequest) {
       album: json.album || "Unknown Album",
       cover_image: json.thumbnail || json.thumbnails?.[0]?.url || "",
     });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: "Failed to fetch Spotify info" }, { status: 500 });
-  }
+  } catch (err) {
+    console.error("Error getting Spotify info:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { success: false, error: errorMessage || "Failed to fetch Spotify info" },
+      { status: 400 },
+    );
 }
 

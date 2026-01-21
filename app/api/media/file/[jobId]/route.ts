@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { Readable } from "stream";
 import { DOWNLOAD_DIR } from "../../download/route";
 import { jobStore } from "@/lib/server/jobStore";
 
@@ -25,7 +26,7 @@ export async function GET(
   const stat = fs.statSync(filePath);
   const fileStream = fs.createReadStream(filePath);
 
-  const response = new NextResponse(fileStream as any, {
+  const response = new NextResponse(fileStream as unknown as Readable, {
     status: 200,
     headers: {
       "Content-Type": "application/octet-stream",
