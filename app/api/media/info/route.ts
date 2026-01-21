@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    console.log("[media-info] Starting request for URL:", url);
     const ytDlp = await getYtDlpWrap();
+    console.log("[media-info] yt-dlp initialized successfully");
     const args: string[] = [
       "--dump-json",
       "--no-playlist",
@@ -143,7 +145,8 @@ export async function POST(req: NextRequest) {
       audio_formats: audioFormats,
     });
   } catch (err) {
-    console.error("Error fetching media info:", err);
+    console.error("[media-info] Caught error:", err);
+    console.error("[media-info] Error stack:", err instanceof Error ? err.stack : "N/A");
     const raw = err instanceof Error ? err.message : String(err);
     let errorMessage = "Failed to fetch media info";
 
