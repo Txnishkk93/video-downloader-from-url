@@ -1,5 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import youtubedl from "youtube-dl-exec";
+import path from "path";
+import os from "os";
+
+const isWin = os.platform() === "win32";
+const binaryName = isWin ? "yt-dlp.exe" : "yt-dlp";
+const binaryPath = path.join(process.cwd(), "node_modules", "youtube-dl-exec", "bin", binaryName);
+const ytdl = youtubedl.create(binaryPath);
 
 const sanitize = (name: string) => name.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "video";
 
@@ -11,7 +18,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     // Try to fetch video title, default to 'video'
     let title = "video";
     try {
-      const info = await youtubedl(url, { dumpSingleJson: true, noWarnings: true, callHome: false, noCheckCertificates: true });
+      const info = await ytdl(url, { dumpSingleJson: true, noWarnings: true, callHome: false, noCheckCertificates: true });
       title = (info as any).title || "video";
     } catch (e) {
       console.warn("Failed to fetch title, using default", e);
@@ -26,7 +33,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     headers.set("Content-Type", "video/mp4");
 
     // Start video download stream
-    const subprocess = youtubedl.exec(url, {
+    const subprocess = ytdl.exec(url, {
       output: '-',
       format: format,
       noWarnings: true,
