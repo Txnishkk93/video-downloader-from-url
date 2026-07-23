@@ -11,7 +11,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     // Try to fetch video title, default to 'video'
     let title = "video";
     try {
-      const info = await youtubedl(url, { dumpSingleJson: true, noWarnings: true, noCallHome: true, noCheckCertificates: true });
+      const info = await youtubedl(url, { dumpSingleJson: true, noWarnings: true, callHome: false, noCheckCertificates: true });
       title = (info as any).title || "video";
     } catch (e) {
       console.warn("Failed to fetch title, using default", e);
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       output: '-',
       format: format,
       noWarnings: true,
-      noCallHome: true,
+      callHome: false,
       noCheckCertificates: true,
     });
     

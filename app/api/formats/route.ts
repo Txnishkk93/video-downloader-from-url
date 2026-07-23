@@ -9,7 +9,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const subprocess = youtubedl.exec(url, {
       listFormats: true,
       noWarnings: true,
-      noCallHome: true,
+      callHome: false,
       noCheckCertificates: true,
     });
     
