@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node node_modules/youtube-dl-exec/scripts/postinstall.js",
+    "prebuild": "node scripts/download.js",
+    "postinstall": "node scripts/download.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

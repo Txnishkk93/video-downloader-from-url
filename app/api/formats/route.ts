@@ -4,8 +4,8 @@ import path from "path";
 import os from "os";
 
 const isWin = os.platform() === "win32";
-const binaryName = isWin ? "yt-dlp.exe" : "yt-dlp";
-const binaryPath = path.join(process.cwd(), "node_modules", "youtube-dl-exec", "bin", binaryName);
+const binaryName = isWin ? "yt-dlp.exe" : "yt-dlp_linux";
+const binaryPath = path.join(process.cwd(), "bin", binaryName);
 const ytdl = youtubedl.create(binaryPath);
 
 export async function POST(req: NextRequest): Promise<Response> {
