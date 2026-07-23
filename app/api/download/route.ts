@@ -15,70 +15,56 @@ export async function POST(req: NextRequest): Promise<Response> {
     const { url, formatId } = await req.json();
     if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
-    let cookiesPath;
-    if (process.env.YOUTUBE_COOKIES) {
-      cookiesPath = path.join(os.tmpdir(), "youtube-cookies.txt");
-      require("fs").writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
-    }
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "799e040346msh216335256517effp1085dcjsn4968c36b32dc";
+    const encodedUrl = encodeURIComponent(url);
 
-    // Try to fetch video title, default to 'video'
-    let title = "video";
-    try {
-      const infoOptions: any = { 
-        dumpSingleJson: true, 
-        noWarnings: true, 
-        noCheckCertificates: true,
-        extractorArgs: 'youtube:player_client=android,ios,mweb,web'
-      };
-      if (cookiesPath) infoOptions.cookies = cookiesPath;
-      const info = await ytdl(url, infoOptions);
-      title = (info as any).title || "video";
-    } catch (e) {
-      console.warn("Failed to fetch title, using default", e);
-    }
-    const filename = `${sanitize(title)}.mp4`;
+    const response = await fetch(`https://youtube-video-download-api1.p.rapidapi.com/?url=${encodedUrl}`, {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": "youtube-video-download-api1.p.rapidapi.com",
+      },
+    });
+
+    const data = await response.json();
     
-    const format = formatId ? formatId : "best";
+    if (data.message === "You are not subscribed to this API.") {
+      throw new Error("RapidAPI Error: You have not subscribed to 'youtube-video-download-api1'. Please go to RapidAPI and subscribe to the basic plan.");
+    }
 
-    // Set up headers for the stream
+    // Try to magically find the video download URL in the unknown JSON structure
+    let videoUrl = "";
+    if (data.url) videoUrl = data.url;
+    else if (data.data?.url) videoUrl = data.data.url;
+    else if (data.formats && data.formats.length > 0) videoUrl = data.formats[0].url;
+    else if (data.data?.formats && data.data.formats.length > 0) videoUrl = data.data.formats[0].url;
+    else if (data.links && data.links.length > 0) videoUrl = data.links[0].url;
+    else if (data.data?.links && data.data.links.length > 0) videoUrl = data.data.links[0].url;
+    else if (data.items && data.items.length > 0) videoUrl = data.items[0].url;
+
+    if (!videoUrl) {
+      throw new Error("Could not automatically find the download URL in the RapidAPI response. Please check the JSON format in the Formats tab.");
+    }
+
+    const title = data.title || data.data?.title || "video";
+    const filename = `${sanitize(title)}.mp4`;
+
+    // Fetch the actual video stream from the RapidAPI download URL
+    const videoStreamResponse = await fetch(videoUrl);
+    
+    if (!videoStreamResponse.ok || !videoStreamResponse.body) {
+      throw new Error("Failed to fetch the actual video stream from the provided RapidAPI link.");
+    }
+
     const headers = new Headers();
     headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
     headers.set("Content-Type", "video/mp4");
 
-    // Start video download stream
-    const streamOptions: any = {
-      output: '-',
-      format: format,
-      noWarnings: true,
-      noCheckCertificates: true,
-      extractorArgs: 'youtube:player_client=android,ios,mweb,web',
-    };
-    if (cookiesPath) streamOptions.cookies = cookiesPath;
-
-    const subprocess = ytdl.exec(url, streamOptions);
-    
-    if (!subprocess.stdout) {
-      throw new Error("Failed to start youtube-dl subprocess stdout");
-    }
-
-    // Convert Node.js stream to Web ReadableStream
-    const responseStream = new ReadableStream({
-      start(controller) {
-        subprocess.stdout?.on('data', (chunk) => controller.enqueue(chunk));
-        subprocess.stdout?.on('end', () => controller.close());
-        subprocess.stdout?.on('error', (err) => controller.error(err));
-        subprocess.on('error', (err) => controller.error(err));
-      },
-      cancel() {
-        subprocess.kill();
-      }
-    });
-
-    return new Response(responseStream, { headers });
+    return new Response(videoStreamResponse.body, { headers });
   } catch (error: any) {
-    console.error("[youtube-dl-exec download error]", error);
+    console.error("[RapidAPI download error]", error);
     return NextResponse.json(
-      { error: error.message || "Failed to download video", details: error.toString() },
+      { error: error.message || "Failed to download video via RapidAPI", details: error.toString() },
       { status: 500 }
     );
   }

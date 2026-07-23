@@ -1,40 +1,35 @@
 import { NextResponse, type NextRequest } from "next/server";
-import youtubedl from "youtube-dl-exec";
-import path from "path";
-import os from "os";
-
-const isWin = os.platform() === "win32";
-const binaryName = isWin ? "yt-dlp.exe" : "yt-dlp_linux";
-const binaryPath = path.join(process.cwd(), "bin", binaryName);
-const ytdl = youtubedl.create(binaryPath);
 
 export async function POST(req: NextRequest): Promise<Response> {
   const { url } = await req.json();
   if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
+  const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "799e040346msh216335256517effp1085dcjsn4968c36b32dc";
+
   try {
-    let cookiesPath;
-    if (process.env.YOUTUBE_COOKIES) {
-      cookiesPath = path.join(os.tmpdir(), "youtube-cookies.txt");
-      require("fs").writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+    const encodedUrl = encodeURIComponent(url);
+    const response = await fetch(`https://youtube-video-download-api1.p.rapidapi.com/?url=${encodedUrl}`, {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": "youtube-video-download-api1.p.rapidapi.com",
+      },
+    });
+
+    const data = await response.json();
+    
+    if (data.message === "You are not subscribed to this API.") {
+      throw new Error("RapidAPI Error: You have not subscribed to the 'youtube-video-download-api1' on RapidAPI yet. Please click 'Subscribe' on the API pricing page.");
     }
 
-    const options: any = {
-      listFormats: true,
-      noWarnings: true,
-      noCheckCertificates: true,
-      extractorArgs: 'youtube:player_client=android,ios,mweb,web',
-    };
-    if (cookiesPath) options.cookies = cookiesPath;
-
-    const subprocess = ytdl.exec(url, options);
+    // Format the JSON data so it looks readable in the frontend's pre block
+    const formattedString = JSON.stringify(data, null, 2);
     
-    const { stdout } = await subprocess;
-    return NextResponse.json({ formats: stdout });
+    return NextResponse.json({ formats: formattedString });
   } catch (error: any) {
-    console.error("[youtube-dl-exec formats error]", error);
+    console.error("[RapidAPI formats error]", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch formats", details: error.toString() },
+      { error: error.message || "Failed to fetch formats from RapidAPI", details: error.toString() },
       { status: 500 }
     );
   }
