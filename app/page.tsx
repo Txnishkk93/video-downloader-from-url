@@ -67,34 +67,25 @@ export default function Home() {
         body: JSON.stringify({ url, formatId: formatId || undefined }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         setStatusType("error");
         setStatus(data.error || "Download failed");
         return;
       }
 
-      // Get filename from Content-Disposition header
-      const contentDisposition = res.headers.get("content-disposition");
-      let filename = "video.mp4";
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+?)"/);
-        if (filenameMatch) filename = filenameMatch[1];
-      }
-
-      // Create blob and trigger download
-      const blob = await res.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
+      // Instead of downloading the blob through the server, we just redirect the user to the direct RapidAPI download link!
+      // This bypasses Vercel entirely, saves massive bandwidth, and fixes the Vercel IP blocking error.
       const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
+      link.href = data.downloadUrl;
+      link.target = "_blank";
+      link.download = data.filename || "video.mp4";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
 
       setStatusType("success");
-      setStatus(`Download complete! File saved as "${filename}"`);
+      setStatus(`Download complete!`);
     } catch {
       setStatusType("error");
       setStatus("Error starting download");

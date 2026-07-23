@@ -39,18 +39,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     const title = data.title || "video";
     const filename = `${sanitize(title)}.mp4`;
 
-    // Fetch the actual video stream from the RapidAPI download URL
-    const videoStreamResponse = await fetch(videoUrl);
-    
-    if (!videoStreamResponse.ok || !videoStreamResponse.body) {
-      throw new Error("Failed to fetch the actual video stream from the provided RapidAPI link.");
-    }
-
-    const headers = new Headers();
-    headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    headers.set("Content-Type", "video/mp4");
-
-    return new Response(videoStreamResponse.body, { headers });
+    // Return the URL directly to the client
+    // By passing it to the client, the user's browser (residential IP) will download the file,
+    // which completely bypasses YouTube's block on Vercel's datacenter IPs!
+    return NextResponse.json({ downloadUrl: videoUrl, filename });
   } catch (error: any) {
     console.error("[RapidAPI download error]", error);
     return NextResponse.json(
