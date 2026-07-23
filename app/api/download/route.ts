@@ -7,37 +7,36 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "799e040346msh216335256517effp1085dcjsn4968c36b32dc";
-    const encodedUrl = encodeURIComponent(url);
+    
+    const videoIdMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    const videoId = videoIdMatch ? videoIdMatch[1] : url;
 
-    const response = await fetch(`https://youtube-video-download-api1.p.rapidapi.com/?url=${encodedUrl}`, {
+    const response = await fetch(`https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=${videoId}`, {
       method: "GET",
       headers: {
         "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "youtube-video-download-api1.p.rapidapi.com",
+        "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com",
       },
     });
 
     const data = await response.json();
     
     if (data.message === "You are not subscribed to this API.") {
-      throw new Error("RapidAPI Error: You have not subscribed to 'youtube-video-download-api1'. Please go to RapidAPI and subscribe to the basic plan.");
+      throw new Error("RapidAPI Error: You have not subscribed to 'youtube-media-downloader'. Please go to RapidAPI and subscribe to the basic plan.");
     }
 
-    // Try to magically find the video download URL in the unknown JSON structure
     let videoUrl = "";
-    if (data.url) videoUrl = data.url;
-    else if (data.data?.url) videoUrl = data.data.url;
-    else if (data.formats && data.formats.length > 0) videoUrl = data.formats[0].url;
-    else if (data.data?.formats && data.data.formats.length > 0) videoUrl = data.data.formats[0].url;
-    else if (data.links && data.links.length > 0) videoUrl = data.links[0].url;
-    else if (data.data?.links && data.data.links.length > 0) videoUrl = data.data.links[0].url;
-    else if (data.items && data.items.length > 0) videoUrl = data.items[0].url;
+    if (data.videos && data.videos.items && data.videos.items.length > 0) {
+      videoUrl = data.videos.items[0].url;
+    } else if (data.audios && data.audios.items && data.audios.items.length > 0) {
+      videoUrl = data.audios.items[0].url;
+    }
 
     if (!videoUrl) {
-      throw new Error("Could not automatically find the download URL in the RapidAPI response. Please check the JSON format in the Formats tab.");
+      throw new Error("Could not automatically find the download URL in the RapidAPI response.");
     }
 
-    const title = data.title || data.data?.title || "video";
+    const title = data.title || "video";
     const filename = `${sanitize(title)}.mp4`;
 
     // Fetch the actual video stream from the RapidAPI download URL
