@@ -13,12 +13,20 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
   try {
-    const subprocess = ytdl.exec(url, {
+    let cookiesPath;
+    if (process.env.YOUTUBE_COOKIES) {
+      cookiesPath = path.join(os.tmpdir(), "youtube-cookies.txt");
+      require("fs").writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+    }
+
+    const options: any = {
       listFormats: true,
       noWarnings: true,
-      callHome: false,
       noCheckCertificates: true,
-    });
+    };
+    if (cookiesPath) options.cookies = cookiesPath;
+
+    const subprocess = ytdl.exec(url, options);
     
     const { stdout } = await subprocess;
     return NextResponse.json({ formats: stdout });

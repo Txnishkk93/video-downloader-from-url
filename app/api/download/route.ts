@@ -15,10 +15,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     const { url, formatId } = await req.json();
     if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
+    let cookiesPath;
+    if (process.env.YOUTUBE_COOKIES) {
+      cookiesPath = path.join(os.tmpdir(), "youtube-cookies.txt");
+      require("fs").writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+    }
+
     // Try to fetch video title, default to 'video'
     let title = "video";
     try {
-      const info = await ytdl(url, { dumpSingleJson: true, noWarnings: true, callHome: false, noCheckCertificates: true });
+      const infoOptions: any = { dumpSingleJson: true, noWarnings: true, noCheckCertificates: true };
+      if (cookiesPath) infoOptions.cookies = cookiesPath;
+      const info = await ytdl(url, infoOptions);
       title = (info as any).title || "video";
     } catch (e) {
       console.warn("Failed to fetch title, using default", e);
@@ -33,13 +41,15 @@ export async function POST(req: NextRequest): Promise<Response> {
     headers.set("Content-Type", "video/mp4");
 
     // Start video download stream
-    const subprocess = ytdl.exec(url, {
+    const streamOptions: any = {
       output: '-',
       format: format,
       noWarnings: true,
-      callHome: false,
       noCheckCertificates: true,
-    });
+    };
+    if (cookiesPath) streamOptions.cookies = cookiesPath;
+
+    const subprocess = ytdl.exec(url, streamOptions);
     
     if (!subprocess.stdout) {
       throw new Error("Failed to start youtube-dl subprocess stdout");
