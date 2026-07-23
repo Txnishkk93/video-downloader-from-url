@@ -1,12 +1,14 @@
 import ytdl from "@distube/ytdl-core";
 import { NextResponse, type NextRequest } from "next/server";
+import { getYoutubeAgent } from "@/lib/youtube-agent";
 
 export async function POST(req: NextRequest): Promise<Response> {
   const { url } = await req.json();
   if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
   try {
-    const info = await ytdl.getInfo(url);
+    const agent = getYoutubeAgent();
+    const info = await ytdl.getInfo(url, { agent });
     
     // Create a string table from the formats array to mimic yt-dlp -F output format
     let formatString = "ID    EXT     RES        FPS    VCODEC         ACODEC         SIZE\n";

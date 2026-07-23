@@ -1,5 +1,6 @@
 import ytdl from "@distube/ytdl-core";
 import { NextResponse, type NextRequest } from "next/server";
+import { getYoutubeAgent } from "@/lib/youtube-agent";
 
 const sanitize = (name: string) => name.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "video";
 
@@ -8,18 +9,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     const { url, formatId } = await req.json();
     if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
-    const info = await ytdl.getInfo(url);
+    const agent = getYoutubeAgent();
+    const info = await ytdl.getInfo(url, { agent });
     const title = info.videoDetails.title || "video";
     const filename = `${sanitize(title)}.mp4`;
     
     // Choose format
-    let formatOptions: ytdl.downloadOptions = { quality: "highest" };
+    let formatOptions: ytdl.downloadOptions = { quality: "highest", agent };
     if (formatId) {
       // Ensure formatId is handled properly by ytdl
-      formatOptions = { quality: formatId };
+      formatOptions = { quality: formatId, agent };
     } else {
       // By default get the highest quality with both video and audio
-      formatOptions = { filter: "audioandvideo", quality: "highest" };
+      formatOptions = { filter: "audioandvideo", quality: "highest", agent };
     }
 
     // Set up headers for the stream
