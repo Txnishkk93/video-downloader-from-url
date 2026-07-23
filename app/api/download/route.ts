@@ -1,9 +1,18 @@
-import { exec } from "child_process";
+import { exec, type ExecException } from "child_process";
 import { NextResponse, type NextRequest } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuidv4 } from "uuid";
+
+function findLocalBinary(names: string[]): string | null {
+  const cwd = process.cwd();
+  for (const name of names) {
+    const local = path.join(cwd, "node_modules", ".bin", name);
+    if (fs.existsSync(local)) return local;
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest): Promise<Response> {
   const { url, formatId } = await req.json();
@@ -14,25 +23,30 @@ export async function POST(req: NextRequest): Promise<Response> {
   const outputTemplate = path.join(tempDir, `yt-dlp-${uniqueId}`);
   const format = formatId ? `-f ${formatId}` : "";
 
+  const candidates = ["yt-dlp", "yt-dlp.exe", "youtube-dl", "youtube-dl.exe"];
+  const localBinary = findLocalBinary(candidates);
+  const binaryToUse = localBinary || "yt-dlp";
+
   return new Promise((resolve) => {
     exec(
-      `yt-dlp ${format} -o "${outputTemplate}.%(ext)s" "${url}"`,
+      `"${binaryToUse}" ${format} -o "${outputTemplate}.%(ext)s" "${url}"`,
       { maxBuffer: 10 * 1024 * 1024, timeout: 300000 },
-      (err, stdout, stderr) => {
+      (err: ExecException | null, stdout: string, stderr: string) => {
         if (err) {
           console.error("[yt-dlp download error]", {
             code: err.code,
             message: err.message,
             stderr,
+            using: binaryToUse,
           });
 
-          // Check if yt-dlp is not found
-          if (err.code === 127 || err.message.includes("not found") || err.message.includes("ENOENT")) {
+          if (err.code === 127 || err.message?.includes("not found") || err.message?.includes("ENOENT")) {
+            const details = localBinary ? `Failed running ${localBinary}` : "yt-dlp command not found";
             return resolve(
               NextResponse.json(
                 {
                   error: "yt-dlp is not installed on this server. Please install it to use this feature.",
-                  details: "yt-dlp command not found",
+                  details,
                 },
                 { status: 503 }
               )
