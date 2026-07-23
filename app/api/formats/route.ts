@@ -23,6 +23,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       listFormats: true,
       noWarnings: true,
       noCheckCertificates: true,
+      extractorArgs: 'youtube:player_client=android,ios,mweb,web',
     };
     if (cookiesPath) options.cookies = cookiesPath;
 

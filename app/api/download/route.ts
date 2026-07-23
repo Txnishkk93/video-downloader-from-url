@@ -24,7 +24,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     // Try to fetch video title, default to 'video'
     let title = "video";
     try {
-      const infoOptions: any = { dumpSingleJson: true, noWarnings: true, noCheckCertificates: true };
+      const infoOptions: any = { 
+        dumpSingleJson: true, 
+        noWarnings: true, 
+        noCheckCertificates: true,
+        extractorArgs: 'youtube:player_client=android,ios,mweb,web'
+      };
       if (cookiesPath) infoOptions.cookies = cookiesPath;
       const info = await ytdl(url, infoOptions);
       title = (info as any).title || "video";
@@ -46,6 +51,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       format: format,
       noWarnings: true,
       noCheckCertificates: true,
+      extractorArgs: 'youtube:player_client=android,ios,mweb,web',
     };
     if (cookiesPath) streamOptions.cookies = cookiesPath;
 
