@@ -1,7 +1,7 @@
 import { exec } from "child_process";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function POST(req) {
+export async function POST(req: NextRequest): Promise<Response> {
   const { url } = await req.json();
   if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
