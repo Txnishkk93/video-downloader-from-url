@@ -17,11 +17,34 @@ export async function POST(req: NextRequest): Promise<Response> {
   return new Promise((resolve) => {
     exec(
       `yt-dlp ${format} -o "${outputTemplate}.%(ext)s" "${url}"`,
-      { maxBuffer: 10 * 1024 * 1024 },
+      { maxBuffer: 10 * 1024 * 1024, timeout: 300000 },
       (err, stdout, stderr) => {
         if (err) {
-          resolve(NextResponse.json({ error: stderr || err.message }, { status: 500 }));
-          return;
+          console.error("[yt-dlp download error]", {
+            code: err.code,
+            message: err.message,
+            stderr,
+          });
+
+          // Check if yt-dlp is not found
+          if (err.code === 127 || err.message.includes("not found") || err.message.includes("ENOENT")) {
+            return resolve(
+              NextResponse.json(
+                {
+                  error: "yt-dlp is not installed on this server. Please install it to use this feature.",
+                  details: "yt-dlp command not found",
+                },
+                { status: 503 }
+              )
+            );
+          }
+
+          return resolve(
+            NextResponse.json(
+              { error: stderr || err.message || "Failed to download video", code: err.code },
+              { status: 500 }
+            )
+          );
         }
 
         // Find the downloaded file with our unique ID
