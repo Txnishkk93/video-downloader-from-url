@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node node_modules/youtube-dl-exec/scripts/postinstall.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
